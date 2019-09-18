@@ -1,0 +1,14 @@
+name: frarl
+dependencies:
+  - python=3.6  
+  - pip
+  - pip:
+    - gym
+    - commonroad-io
+    - tensorflow
+    - numpy==1.16.4
+    - pandas
+    - Cython
+    - pkgconfig
+    # - git+https://github.com/openai/baselines.git
+  

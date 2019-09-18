@@ -1,0 +1,95 @@
+S-Taliro Code Documentation
+
+This document indicates the working of each of the scripts (preserves flow of the code within each scripts) that are internally called when the "staliro" function is called in the main script.
+
+1. staliro.m
+	- called as:
+		[results, history] = staliro(model, init_cond, input_range, cp_array, phi, preds, total_sim_time, options)
+
+	- check for erros in options, model, phi, preds
+	- ensure total_sim_time is of type real
+	- check that if options.taliro_metric is none, then map2line is 0
+	- check if parameter estimation is to be performed (set in options)
+	- check init_cond, input_range, cp_array, input interpolation
+	- calculate number of check points based on cp_array
+	- perform normalization to range [0, 1] on parameters, if set in options
+	- initialize output variables, namely, results and history, as struct
+	- call RunStats
+	- call the optimization solver, as set in options
+
+
+2. RunStates.m
+	- collects statistics on staliro runs
+	- initialized as:
+		RunStats(parallel_optim_on) --> if parallel_optim_on = 1, then the statistics are not stored
+	- has functions to
+		* begin new run -- new_run
+		* stop collection of statistics -- stop_collecting
+		* resume statistics collection -- resume_collecting
+
+
+3. optimization/SA_Taliro.m --> assuming that SA_Taliro is set as the optimization solver in options
+	- called as:
+		[run, history] = SA_Taliro(inpRanges, options)
+
+	- performs stochastic optimization using simulated annealing, with the robustness value as the cost function
+
+	- for constrained seach space, create sample space polyhedron
+	- get number of tests to execute and stopping condition
+	- initialize output variables
+	- set adaptation parameters and fcn_cmp (compare function) based on whether parameter estimation is to be performed or not
+	- start optimization, which loops over two main steps:
+		* get new sample --> cs = getNewSample(inpRanges)
+		* compute robustness  --> Compute_Robustness(cs)
+
+
+4. optimization/auxiliary/getNewSample.m
+	- called as:
+		newSample = getNewSample(args_in)
+	- computes specification of input range and control points as passed via args_in to generate a new sample to test the simulation on
+
+
+5. auxiliary/Compute_Robustness.m
+	- called as: 
+		[cost, ind, cur_par, rob] = Compute_Robustness(input)
+		* cost = rob for falsification
+		* ind = flag for errors
+		* cur_par = parameter values
+		* rob = robustness value
+
+	- initialize output variables
+	- compare size of input and n_workers
+	- check for need of computing robustness in parallel (call globalBridge) or not (call Compute_Robustness_Right)
+
+
+6. auxiliary/Compute_Robustness_Right.m
+	- called as:
+		[cost, ind, cur_par, rob] = Compute_Robustness_Right(inputModel, inputModdelType, inpArray)
+
+	- initialize RCamp, which is a singleton class that stores return codes like success, simulation_failure etc --> gets stored in ind
+	- if normalization is set, rescale back to original range
+	- if paramter estimation is set, get parameter values accordingly
+	- run simulator (called systemsimulator) to get the values hs and rc
+		* hs = [T, XT,YT, LT, CLG, GRD] --> values retrieved after running the simulator with the newsample, indicative of the corresponding trajectory
+		* rc = return codes to be compared against RCamp to determine if the simulator ran successfully or not
+	- calcualte robustness value based on options set for taliro (dp_taliro, fw_taliro, tp_taliro, dp_t_taliro) and taliro_metric
+	- check for errors if parameter estimation is performed
+	- normalize the values, if set in options
+	- handle parameter estimation
+
+
+7. systemsimulator.m
+	- called as:
+		[hs, rc] = systemsimulator(inputModel, XPoint, UPoint, simTime, inputBounds, nb_controlPts, opt_offline)
+		* hs = output trajectory as a struct ([T, XT,YT, LT, CLG, GRD])
+		* rc = return codes indicating success or failure of simulation
+		* inputModel = system to simulate
+		* XPoint = vector of initial conditions to test in the simulation
+		* UPoint = vector of control points
+		* simTime = duration of simulation / length of trajectory
+		* inputBounds = lower and upper bound on input values
+		* nb_controlPts = length of UPoint
+		* opt_offline = when system called from outside of S-Taliro
+
+	- based on the inputModelType the corresponding model simulation is called
+		* for blackbox models --> calls the function pointer specifying the py code to be called for the simluation to get the associated trajectory

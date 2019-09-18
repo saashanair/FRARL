@@ -1,0 +1,18 @@
+# Add any directories, files, or patterns you don't want to be tracked by version control
+algorithms/logs/*
+staliro_imports/*
+simulator/gym_car_acc.egg-info
+
+.idea/
+.ipynb_checkpoints
+
+*.py[cod]
+algorithms/__pycache__/*
+*.png
+*.jpg
+*.mexa64
+*.h5
+*.csv
+*.mp4
+*.npy
+*.npz
